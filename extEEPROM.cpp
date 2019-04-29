@@ -162,28 +162,33 @@ byte extEEPROM::write(unsigned long addr, byte *values, unsigned int nBytes)
 //from the Arduino Wire library is passed back through to the caller.
 byte extEEPROM::read(unsigned long addr, byte *values, unsigned int nBytes)
 {
-    byte ctrlByte;
-    byte rxStatus;
-    uint16_t nRead;             //number of bytes to read
-    uint16_t nPage;             //number of bytes remaining on current page, starting at addr
-
     if (addr + nBytes > _totalCapacity) {   //will this read take us past the top of the EEPROM?
         return EEPROM_ADDR_ERR;             //yes, tell the caller
     }
 
     while (nBytes > 0) {
-        nPage = _pageSize - ( addr & (_pageSize - 1) );
-        nRead = nBytes < nPage ? nBytes : nPage;
-        nRead = BUFFER_LENGTH < nRead ? BUFFER_LENGTH : nRead;
-        ctrlByte = _eepromAddr | (byte) (addr >> _csShift);
+        //number of bytes remaining on current page, starting at addr
+        const unsigned int nPage = _pageSize - ( addr & (_pageSize - 1) );
+        // number of bytes to read = minimum of: nBytes, nPage and BUFFER_LENGTH
+        static_assert(BUFFER_LENGTH < UINT8_MAX, "BUFFER_LENGTH value has to fit into uint8_t");
+        const uint8_t nRead = min(min(nBytes, nPage), static_cast<unsigned int>(BUFFER_LENGTH));
+        const byte ctrlByte = _eepromAddr | static_cast<byte>(addr >> _csShift);
+
         communication->beginTransmission(ctrlByte);
-        if (_nAddrBytes == 2) communication->write( (byte) (addr >> 8) );   //high addr byte
-        communication->write( (byte) addr );                                //low addr byte
-        rxStatus = communication->endTransmission();
-        if (rxStatus != 0) return rxStatus;        //read error
+
+        if (_nAddrBytes == 2)
+            communication->write( static_cast<byte>(addr >> 8) ); //high addr byte
+
+        communication->write( static_cast<byte>(addr) );          //low addr byte
+        const byte rxStatus = communication->endTransmission();
+
+        if (rxStatus != 0)
+            return rxStatus;    //read error
 
         communication->requestFrom(ctrlByte, nRead);
-        for (byte i=0; i<nRead; i++) values[i] = communication->read();
+
+        for (byte i=0; i<nRead; i++)
+            values[i] = communication->read();
 
         addr += nRead;          //increment the EEPROM address
         values += nRead;        //increment the input data pointer
