@@ -114,7 +114,7 @@ byte extEEPROM::begin(twiClockFreq_t twiFreq, TwoWire *_comm)
 //If the I/O would extend past the top of the EEPROM address space,
 //a status of EEPROM_ADDR_ERR is returned. For I2C errors, the status
 //from the Arduino Wire library is passed back through to the caller.
-byte extEEPROM::write(unsigned long addr, byte *values, unsigned int nBytes)
+byte extEEPROM::write(unsigned long addr, const byte *values, unsigned int nBytes)
 {
     uint8_t ctrlByte;       //control byte (I2C device address & chip/block select bits)
     uint8_t txStatus = 0;   //transmit status
@@ -217,13 +217,48 @@ int extEEPROM::read(unsigned long addr)
 
 //Update bytes to external EEPROM.
 //For I2C errors, the status from the Arduino Wire library is passed back through to the caller.
-byte extEEPROM::update(unsigned long addr, byte *values, unsigned int nBytes)
+byte extEEPROM::update(unsigned long addr, const byte *values, unsigned int nBytes)
 {
-    if (nBytes == 1) {
-        return update(addr, values[0]);
+    decltype(nBytes) off = 0;
+
+    while (nBytes > 0) {
+        byte tmpBuf[BUFFER_LENGTH];
+        static_assert(BUFFER_LENGTH < UINT8_MAX, "BUFFER_LENGTH value has to fit into uint8_t");
+        const uint8_t readBytes = min(nBytes, static_cast<decltype(nBytes)>(BUFFER_LENGTH));
+        const auto currAddress = addr + off;
+        const auto rv = read(currAddress, tmpBuf, readBytes);
+        if (rv != 0)
+            return rv;
+
+        auto startDiff = 0;
+
+        while (startDiff < readBytes) {
+            if (tmpBuf[startDiff] == values[currAddress + startDiff]) {
+                startDiff++;
+                continue;
+            }
+
+            auto endDiff = startDiff + 1;
+
+            while (endDiff < readBytes) {
+                if (tmpBuf[endDiff] != values[currAddress + endDiff]) {
+                    endDiff++;
+                    continue;
+                }
+            }
+
+            const auto wv = write(currAddress + startDiff, &values[off + startDiff], endDiff - startDiff);
+            if (wv)
+                return wv;
+
+            startDiff = endDiff;
+        }
+
+        off    += readBytes;
+        nBytes -= readBytes;
     }
 
-    return false;
+    return 0;
 }
 
 //Update a single byte to external EEPROM.
