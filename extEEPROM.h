@@ -47,9 +47,12 @@
  * 29Mar2013 v2 - Updated to span page boundaries (and therefore also          *
  * device boundaries, assuming an integral number of pages per device)         *
  * 08Jul2014 v3 - Generalized for 2kb - 2Mb EEPROMs.                           *
- * 																			   *
- * Paolo Paolucci 22-10-2015 v3.2											   *
- * 09-01-2016 v3.2 Add update function.										   *
+ *                                                                             *
+ * Paolo Paolucci 22-10-2015 v3.2                                              *
+ * 09-01-2016 v3.2 Add update function.                                        *
+ *                                                                             *
+ * Damian Wrobel <dwrobel@ertelnet.rybnik.pl>                                  *
+ * 29-04-2019 v3.4.2 Implement update() method.                                *
  *                                                                             *
  * External EEPROM Library by Jack Christensen is licensed under CC BY-SA 4.0, *
  * http://creativecommons.org/licenses/by-sa/4.0/                              *
@@ -93,11 +96,11 @@ class extEEPROM
         // It is ready for every I2C Sercom, by default use the main Wire
         byte begin(twiClockFreq_t twiFreq = twiClock100kHz, TwoWire *_comm=&Wire); 
         
-        byte write(unsigned long addr, byte *values, unsigned int nBytes);
+        byte write(unsigned long addr, const byte *values, unsigned int nBytes);
         byte write(unsigned long addr, byte value);
         byte read(unsigned long addr, byte *values, unsigned int nBytes);
         int read(unsigned long addr);
-        byte update(unsigned long addr, byte *values, unsigned int nBytes);
+        byte update(unsigned long addr, const byte *values, unsigned int nBytes);
         byte update(unsigned long addr, byte value);
         unsigned long length();
 
